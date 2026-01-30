@@ -390,16 +390,52 @@ double MotionPlanner::get_reach_time(MotionPositions current_pos, MotionPosition
   return std::max(dmax / approach_vel_, approach_min_duration_);
 }
 
+// void MotionPlanner::joint_states_callback(const JointState::SharedPtr msg)
+// {
+//   std::unique_lock<std::mutex> lock(joint_states_mutex_);
+//   if (!joint_states_updated_) {
+//     joint_states_.clear();
+//     for (auto i = 0u; i < msg->name.size(); ++i) {
+//       joint_states_[msg->name[i]] = {msg->position[i], msg->velocity[i], msg->effort[i]};
+//     }
+//     joint_states_updated_ = true;
+//   }
+//   joint_states_condition_.notify_one();
+// }
+
 void MotionPlanner::joint_states_callback(const JointState::SharedPtr msg)
 {
+  if (!msg) {return;}
+
+  const size_t n = msg->name.size();
+  if (n == 0) {return;}
+
+  // positions are required for this class to function
+  if (msg->position.size() < n) {
+    RCLCPP_WARN_THROTTLE(
+      node_->get_logger(), *node_->get_clock(), 2000,
+      "/joint_states malformed: name.size()=%zu position.size()=%zu (dropping message)",
+      n, msg->position.size());
+    return;
+  }
+
   std::unique_lock<std::mutex> lock(joint_states_mutex_);
+
+  // This callback is used as a one-shot "wake up" for waiting threads.
   if (!joint_states_updated_) {
     joint_states_.clear();
-    for (auto i = 0u; i < msg->name.size(); ++i) {
-      joint_states_[msg->name[i]] = {msg->position[i], msg->velocity[i], msg->effort[i]};
+
+    for (size_t i = 0; i < n; ++i) {
+      const double pos = msg->position[i];
+      const double vel = (msg->velocity.size() > i) ? msg->velocity[i] : 0.0;
+      const double eff = (msg->effort.size() > i) ? msg->effort[i] : 0.0;
+      joint_states_[msg->name[i]] = {pos, vel, eff};
     }
+
     joint_states_updated_ = true;
   }
+
+  lock.unlock();
   joint_states_condition_.notify_one();
 }
 
@@ -888,24 +924,28 @@ bool MotionPlanner::are_all_joints_included(
 
 bool MotionPlanner::needs_approach(const MotionInfo & approach_info)
 {
-  // Wait until joint_states_ updated and set current positions
   std::unique_lock<std::mutex> lock(joint_states_mutex_);
   joint_states_updated_ = false;
   joint_states_condition_.wait(lock, [&] {return joint_states_updated_;});
 
-  for (const auto & joint : approach_info.joints) {
-    {
-      const auto joint_pos = std::distance(
-        approach_info.joints.begin(),
-        std::find(approach_info.joints.begin(), approach_info.joints.end(), joint));
-      const auto goal_pos = approach_info.positions[joint_pos];
-      const auto current_pos = joint_states_[joint][0];
+  for (size_t j = 0; j < approach_info.joints.size(); ++j) {
+    const auto & joint = approach_info.joints[j];
+    const double goal_pos = approach_info.positions[j];
 
-      if (std::abs(current_pos - goal_pos) > joint_tolerance_) {
-        return true;
-      }
+    const auto it = joint_states_.find(joint);
+    if (it == joint_states_.end() || it->second.empty()) {
+      RCLCPP_WARN_STREAM(
+        node_->get_logger(),
+        "Joint '" << joint << "' missing in cached /joint_states; assuming approach needed");
+      return true;
+    }
+
+    const double current_pos = it->second[0];
+    if (std::abs(current_pos - goal_pos) > joint_tolerance_) {
+      return true;
     }
   }
+
   return false;
 }
 
