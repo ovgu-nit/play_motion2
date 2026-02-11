@@ -1,9 +1,16 @@
 # PlayMotion2
 
+> **NIT Fork**: This is the OVGU-NIT fork of PlayMotion2 with stability fixes and enhancements for our lab robots.  
+> Original repository: [PAL Robotics/play_motion2](https://github.com/pal-robotics/play_motion2)
+
 This repository consists of `play_motion2`, a tool to play and handle pre-recorded motions in ROS 2,
 and its associated messages in `play_motion2_msgs`.
 
 PlayMotion2 allows executing simultaneous trajectories in multiple groups of joints.
+
+## NIT Modifications
+- **Stability fixes**: Enhanced joint_states_callback for robustness against segfaults
+- **Improved motion planning**: Better needs_approach logic for trajectory execution
 
 ## Prerequisites
 
