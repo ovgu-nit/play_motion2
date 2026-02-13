@@ -121,7 +121,7 @@ void MotionPlanner::check_parameters()
     if (approach_min_duration_it->second.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE &&
       approach_min_duration_it->second.as_double() >= 0.0)
     {
-      approach_vel_ = approach_min_duration_it->second.as_double();
+      approach_min_duration_ = approach_min_duration_it->second.as_double();
     } else {
       RCLCPP_WARN_STREAM(
         node_->get_logger(),
