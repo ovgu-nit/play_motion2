@@ -76,7 +76,7 @@ MotionPlanner::MotionPlanner(rclcpp_lifecycle::LifecycleNode::SharedPtr node)
 
   joint_states_sub_ =
     node_->create_subscription<JointState>(
-    "/joint_states", 1,
+    "joint_states", 1,
     std::bind(&MotionPlanner::joint_states_callback, this, _1), options);
 
 #if RCLCPP_VERSION_MAJOR >= 17
@@ -88,7 +88,7 @@ MotionPlanner::MotionPlanner(rclcpp_lifecycle::LifecycleNode::SharedPtr node)
   const rmw_qos_profile_t qos_services = rmw_qos_profile_default;
 #endif
   list_controllers_client_ = node_->create_client<ListControllers>(
-    "/controller_manager/list_controllers", qos_services, motion_planner_cb_group_);
+    "controller_manager/list_controllers", qos_services, motion_planner_cb_group_);
 
   move_group_node_ = rclcpp::Node::make_shared("_move_group_node", node_->get_name());
 
@@ -187,8 +187,8 @@ void MotionPlanner::check_parameters()
       }
     };
 
-  wait_for_description("/robot_description");
-  wait_for_description("/robot_description_semantic");
+  wait_for_description("robot_description");
+  wait_for_description("robot_description_semantic");
 
   for (const auto & group : planning_groups_) {
     move_groups_.emplace_back(std::make_shared<MoveGroupInterface>(move_group_node_, group));
@@ -414,7 +414,7 @@ void MotionPlanner::joint_states_callback(const JointState::SharedPtr msg)
   if (msg->position.size() < n) {
     RCLCPP_WARN_THROTTLE(
       node_->get_logger(), *node_->get_clock(), 2000,
-      "/joint_states malformed: name.size()=%zu position.size()=%zu (dropping message)",
+      "joint_states malformed: name.size()=%zu position.size()=%zu (dropping message)",
       n, msg->position.size());
     return;
   }
@@ -694,7 +694,7 @@ FollowJTGoalHandleFutureResult MotionPlanner::send_trajectory(
   } else {
     action_client = rclcpp_action::create_client<FollowJointTrajectory>(
       node_,
-      "/" + controller_name + "/follow_joint_trajectory",
+      "" + controller_name + "/follow_joint_trajectory",
       motion_planner_cb_group_);
     action_clients_[controller_name] = action_client;
   }
@@ -702,7 +702,7 @@ FollowJTGoalHandleFutureResult MotionPlanner::send_trajectory(
   if (!action_client->wait_for_action_server(1s)) {
     RCLCPP_ERROR_STREAM(
       node_->get_logger(),
-      "/" << controller_name <<
+      "" << controller_name <<
         "/follow_joint_trajectory action server not available after waiting");
     return {};
   }
@@ -936,7 +936,7 @@ bool MotionPlanner::needs_approach(const MotionInfo & approach_info)
     if (it == joint_states_.end() || it->second.empty()) {
       RCLCPP_WARN_STREAM(
         node_->get_logger(),
-        "Joint '" << joint << "' missing in cached /joint_states; assuming approach needed");
+        "Joint '" << joint << "' missing in cached joint_states; assuming approach needed");
       return true;
     }
 

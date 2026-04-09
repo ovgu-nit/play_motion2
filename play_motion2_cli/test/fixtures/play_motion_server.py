@@ -65,7 +65,7 @@ class DummyPlayMotionServer(Node):
         self.action_server = ActionServer(
             self,
             PlayMotion2,
-            '/play_motion2',
+            'play_motion2',
             execute_callback=self.execute_callback,
             goal_callback=self.goal_callback,
         )
