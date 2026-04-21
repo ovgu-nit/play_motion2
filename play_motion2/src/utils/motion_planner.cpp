@@ -90,7 +90,7 @@ MotionPlanner::MotionPlanner(rclcpp_lifecycle::LifecycleNode::SharedPtr node)
   list_controllers_client_ = node_->create_client<ListControllers>(
     "controller_manager/list_controllers", qos_services, motion_planner_cb_group_);
 
-  move_group_node_ = rclcpp::Node::make_shared("_move_group_node", node_->get_name());
+  move_group_node_ = rclcpp::Node::make_shared("_move_group_node", node_->get_namespace());
 
   check_parameters();
 }
@@ -421,19 +421,14 @@ void MotionPlanner::joint_states_callback(const JointState::SharedPtr msg)
 
   std::unique_lock<std::mutex> lock(joint_states_mutex_);
 
-  // This callback is used as a one-shot "wake up" for waiting threads.
-  if (!joint_states_updated_) {
-    joint_states_.clear();
-
-    for (size_t i = 0; i < n; ++i) {
-      const double pos = msg->position[i];
-      const double vel = (msg->velocity.size() > i) ? msg->velocity[i] : 0.0;
-      const double eff = (msg->effort.size() > i) ? msg->effort[i] : 0.0;
-      joint_states_[msg->name[i]] = {pos, vel, eff};
-    }
-
-    joint_states_updated_ = true;
+  // Accumulate joints from all publishers (e.g. arm + gripper on same topic).
+  for (size_t i = 0; i < n; ++i) {
+    const double pos = msg->position[i];
+    const double vel = (msg->velocity.size() > i) ? msg->velocity[i] : 0.0;
+    const double eff = (msg->effort.size() > i) ? msg->effort[i] : 0.0;
+    joint_states_[msg->name[i]] = {pos, vel, eff};
   }
+  joint_states_updated_ = true;
 
   lock.unlock();
   joint_states_condition_.notify_one();
