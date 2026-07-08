@@ -137,10 +137,10 @@ void MotionPlanner::check_parameters()
   }
 
   if (planning_disabled_) {
-    RCLCPP_WARN(
-      node_->get_logger(),
-      "Motion planning capability DISABLED. Goals requesting planning (the default) "
-      "will be rejected. To disable planning in goal requests set 'skip_planning: true'");
+    // RCLCPP_WARN(
+    //   node_->get_logger(),
+    //   "Motion planning capability DISABLED. Goals requesting planning (the default) "
+    //   "will be rejected. To disable planning in goal requests set 'skip_planning: true'");
 
     return;  // Skip initialization of planning-related members when all planning is disabled
   }
