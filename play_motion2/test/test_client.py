@@ -45,7 +45,7 @@ class ClientTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        rclpy.shutdown()
+        rclpy.try_shutdown()
 
     def setUp(self):
         self._executor_srv = MultiThreadedExecutor()
