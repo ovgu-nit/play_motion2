@@ -68,11 +68,12 @@ MotionPlanner::MotionPlanner(rclcpp_lifecycle::LifecycleNode::SharedPtr node)
 
   , node_(node)
 {
-  motion_planner_cb_group_ = node_->create_callback_group(
+  joint_states_cb_group_ = node_->create_callback_group(
     rclcpp::CallbackGroupType::MutuallyExclusive);
+  client_cb_group_ = node_->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
 
   rclcpp::SubscriptionOptions options;
-  options.callback_group = motion_planner_cb_group_;
+  options.callback_group = joint_states_cb_group_;
 
   joint_states_sub_ =
     node_->create_subscription<JointState>(
@@ -88,7 +89,7 @@ MotionPlanner::MotionPlanner(rclcpp_lifecycle::LifecycleNode::SharedPtr node)
   const rmw_qos_profile_t qos_services = rmw_qos_profile_default;
 #endif
   list_controllers_client_ = node_->create_client<ListControllers>(
-    "controller_manager/list_controllers", qos_services, motion_planner_cb_group_);
+    "controller_manager/list_controllers", qos_services, client_cb_group_);
 
   move_group_node_ = rclcpp::Node::make_shared("_move_group_node", node_->get_namespace());
 
@@ -267,12 +268,7 @@ Result MotionPlanner::perform_motion(
     return send_result;
   }
 
-  std::vector<std::string> controllers;
-  for (const auto & traj : ctrl_trajectories) {
-    controllers.push_back(traj.first);
-  }
-
-  const auto result = wait_for_results(controllers, final_motion_time, futures_list);
+  const auto result = wait_for_results(final_motion_time, futures_list);
 
   return result;
 }
@@ -690,7 +686,7 @@ FollowJTGoalHandleFutureResult MotionPlanner::send_trajectory(
     action_client = rclcpp_action::create_client<FollowJointTrajectory>(
       node_,
       "" + controller_name + "/follow_joint_trajectory",
-      motion_planner_cb_group_);
+      client_cb_group_);
     action_clients_[controller_name] = action_client;
   }
 
@@ -759,7 +755,6 @@ Result MotionPlanner::send_trajectories(
 }
 
 Result MotionPlanner::wait_for_results(
-  const std::vector<std::string> & motion_controllers,
   const double motion_time,
   std::list<FollowJTGoalHandleFutureResult> & futures_list)
 {
@@ -797,9 +792,9 @@ Result MotionPlanner::wait_for_results(
       futures_list.end());
     on_time = (node_->now() - init_time).seconds() < TIMEOUT;
 
-    // The FollowJointTrajectory result is authoritative. Polling
-    // controller_manager here can time out while its executor is handling
-    // the same motion, turning a completed trajectory into a false failure.
+    // The trajectory result is authoritative.  Service/action clients use a
+    // separate callback group, so high-rate joint-state updates cannot starve
+    // their completion callbacks.
 
     if (is_canceling_) {
       cancel_all_goals();

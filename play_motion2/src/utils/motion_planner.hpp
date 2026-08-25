@@ -111,7 +111,6 @@ private:
     std::list<FollowJTGoalHandleFutureResult> & futures_list);
 
   Result wait_for_results(
-    const std::vector<std::string> & motion_controllers,
     const double motion_time,
     std::list<FollowJTGoalHandleFutureResult> & futures_list);
 
@@ -151,7 +150,8 @@ private:
   std::mutex joint_states_mutex_;
   std::condition_variable joint_states_condition_;
 
-  rclcpp::CallbackGroup::SharedPtr motion_planner_cb_group_;
+  rclcpp::CallbackGroup::SharedPtr joint_states_cb_group_;
+  rclcpp::CallbackGroup::SharedPtr client_cb_group_;
   rclcpp::Client<ListControllers>::SharedPtr list_controllers_client_;
 
   std::map<std::string, rclcpp_action::Client<FollowJointTrajectory>::SharedPtr> action_clients_;
