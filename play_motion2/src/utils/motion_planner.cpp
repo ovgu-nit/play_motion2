@@ -797,40 +797,9 @@ Result MotionPlanner::wait_for_results(
       futures_list.end());
     on_time = (node_->now() - init_time).seconds() < TIMEOUT;
 
-    auto current_states = filter_controller_states(
-      get_controller_states(), "active", "joint_trajectory_controller/JointTrajectoryController");
-
-    // A transient controller-manager timeout is not evidence that a running
-    // controller disappeared. In particular, this action callback may race
-    // the manager while the trajectory result is already on its way.
-    if (current_states.empty()) {
-      RCLCPP_WARN_THROTTLE(
-        node_->get_logger(), *node_->get_clock(), 5000,
-        "Skipping controller activity check: no controller state response");
-      continue;
-    }
-
-    // If any controller changes, check if it is used in the motion.
-    // If so, cancel all goals and return an error.
-    if (current_states != motion_controller_states_) {
-      std::vector<std::string> current_controllers;
-      for (const auto & controller : current_states) {
-        current_controllers.push_back(controller.name);
-      }
-
-      for (const auto & controller : motion_controllers) {
-        if (std::find(current_controllers.begin(), current_controllers.end(), controller) ==
-          current_controllers.end())
-        {
-          cancel_all_goals();
-          failed = true;
-          result = Result(
-            Result::State::ERROR,
-            "Controller '" + controller + "' has been deactivated while executing the motion");
-          RCLCPP_ERROR_STREAM(node_->get_logger(), result.error);
-        }
-      }
-    }
+    // The FollowJointTrajectory result is authoritative. Polling
+    // controller_manager here can time out while its executor is handling
+    // the same motion, turning a completed trajectory into a false failure.
 
     if (is_canceling_) {
       cancel_all_goals();
